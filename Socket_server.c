@@ -4,22 +4,47 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <database_ctr.h>
+
 
 #define PORT 8080
 #define MAX_CLIENTS 10
+
+char *data_base_name = "test.db";
 
 // 客户端处理函数
 void *handle_client(void *socket_desc) {
     int sock = *(int *)socket_desc;
     free(socket_desc); // 释放内存
     char client_message[2000]; // 缓冲区用于存储客户端消息
+    char response_message[2000]; // 用于存储从数据库检索的数据
     int read_size;
 
     // 接收客户端消息
     while ((read_size = recv(sock, client_message, 2000, 0)) > 0) {
         client_message[read_size] = '\0';
         printf("Received from client: %s\n", client_message);
-        send(sock, client_message, strlen(client_message), 0); // 发送响应给客户端
+        //send(sock, client_message, strlen(client_message), 0); // 发送响应给客户端
+
+        // 将数据插入数据库
+        if (database_insert(data_base_name, client_message) == 0) {
+            printf("Data inserted successfully\n");
+        } else {
+            printf("Failed to insert data\n");
+        }
+
+        // 从数据库中选择数据
+        //database_select(data_base_name, response_message, MAX_MESSAGE_SIZE) == 0
+        if (database_select(data_base_name, response_message, 2000) == 0) {
+       		printf("Data select successfully\n");
+            // 发送响应消息给客户端
+            if (send(sock, response_message, strlen(response_message), 0) < 0) {
+                perror("send failed");
+            }
+        } else {
+            printf("Failed to select data\n");
+        }
+
     }
 
     if (read_size == 0) {
@@ -33,6 +58,13 @@ void *handle_client(void *socket_desc) {
 }
 
 int main() {
+
+    // 创建数据库表
+    if (create_table(data_base_name) != 0) {
+        fprintf(stderr, "Failed to create table\n");
+        return 1;
+    }
+
     // 创建socket
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (server_sock == -1) {

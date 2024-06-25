@@ -40,7 +40,7 @@ int main() {
     while (1) {
         printf("Enter message: ");
         scanf("%s", message);
-
+	
         /* 发送消息给服务器 */
         if (send(sock, message, strlen(message), 0) < 0) {
             perror("send failed");
@@ -53,10 +53,11 @@ int main() {
         /* 接收服务器的响应 */
         if (recv(sock, server_reply, 2000, 0) < 0) {
             perror("recv failed");
-            break;
+            return EXIT_FAILURE;
         }
 
-        printf("Server reply: %s\n", server_reply);
+          printf("Server reply: %s\n", server_reply);
+        
     }
 
     close(sock);

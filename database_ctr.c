@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sqlite3.h>
 
 
@@ -58,62 +59,37 @@ int database_insert(const char *data_base_name, const char *data) {
 }
 
 
-int database_select(const char *data_base_name)
-{
+int database_select(const char *data_base_name, char *response_message, int max_size) {
     sqlite3 *db;
     sqlite3_stmt *res;
-    int rc,i=0;
+    int rc;
     const char *sql = "SELECT * FROM Messages;";
 
-    rc = sqlite3_open(data_base_name,&db);
-    if(rc != SQLITE_OK)
-    {
+    rc = sqlite3_open(data_base_name, &db);
+    if (rc != SQLITE_OK) {
         fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         return 1;
     }
 
     rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
-    if(rc != SQLITE_OK)
-    {
+    if (rc != SQLITE_OK) {
         fprintf(stderr, "Failed to fetch data: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         return 1;
     }
 
-    while(sqlite3_step(res) ==  SQLITE_ROW)
-    {
-        printf("%s\n", sqlite3_column_text(res, 1));
-        printf("%s\n",i);
-        i++;//第几次插入
+    // 清空响应消息缓冲区
+    response_message[0] = '\0';
+    int total_length = 0;
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        const char *data = (const char *)sqlite3_column_text(res, 1);
+        strcat(response_message, data);
+        strcat(response_message, "\n");
     }
+
     sqlite3_finalize(res);
     sqlite3_close(db);
     return 0;
 }
 
-int main() //测试
-{
-    const char *data_base_name = "test.db";//后续需要改文件名
-    const char *data = "Hello, World!";//测试
-
-
-    // 创建表
-    if (create_table(data_base_name) != 0) {
-        fprintf(stderr, "Failed to create table\n");
-        return 1;
-    }
-    // 插入数据到数据库
-    if (database_insert(data_base_name, data) != 0) {
-        fprintf(stderr, "Failed to insert data\n");
-        return 1;
-    }
-
-    // 从数据库中选择数据
-    if (database_select(data_base_name) != 0) {
-        fprintf(stderr, "Failed to select data\n");
-        return 1;
-    }
-
-    return 0;
-}
