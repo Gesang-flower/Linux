@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <database_ctr.h>
-
+#include <databaseobject.h>
 
 #define PORT 8080
 #define MAX_CLIENTS 10
@@ -27,11 +27,14 @@ void *handle_client(void *socket_desc) {
         //send(sock, client_message, strlen(client_message), 0); // 发送响应给客户端
 
         // 将数据插入数据库
-        if (database_insert(data_base_name, client_message) == 0) {
-            printf("Data inserted successfully\n");
-        } else {
-            printf("Failed to insert data\n");
-        }
+        //if (database_insert(data_base_name, client_message) == 0) {
+        //    printf("Data inserted successfully\n");
+        //} else {
+        //    printf("Failed to insert data\n");
+        //}
+
+        // 发送插入请求给dbus服务
+        send_insert_request(data_base_name,client_message);
 
         // 从数据库中选择数据
         //database_select(data_base_name, response_message, MAX_MESSAGE_SIZE) == 0
@@ -64,6 +67,9 @@ int main() {
         fprintf(stderr, "Failed to create table\n");
         return 1;
     }
+
+    // 注册dbus服务
+    register_dbus_service();
 
     // 创建socket
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);

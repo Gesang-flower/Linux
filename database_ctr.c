@@ -84,8 +84,16 @@ int database_select(const char *data_base_name, char *response_message, int max_
     int total_length = 0;
     while (sqlite3_step(res) == SQLITE_ROW) {
         const char *data = (const char *)sqlite3_column_text(res, 1);
+        int len = strlen(data);
+        if (total_length + len + 1 > max_size) {
+            fprintf(stderr, "Response message buffer too small\n");
+            sqlite3_finalize(res);
+            sqlite3_close(db);
+            return 1;
+        }
         strcat(response_message, data);
         strcat(response_message, "\n");
+        total_length += len + 1;
     }
 
     sqlite3_finalize(res);
