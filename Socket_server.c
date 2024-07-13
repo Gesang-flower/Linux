@@ -2,74 +2,159 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <database_ctr.h>
-#include <databaseobject.h>
+#include <systemd/sd-bus.h>
 
 #define PORT 8080
 #define MAX_CLIENTS 10
 
-char *data_base_name = "test.db";
+// Declare sd_bus object globally
+sd_bus *bus = NULL;
+
+/********/
+static void print_error(const char *prefix, int r) {
+    fprintf(stderr, "%s: %s\n", prefix, strerror(-r));
+}
+
+static void print_reply(sd_bus_message *reply) {
+    const char *response_message;
+    int r = sd_bus_message_read(reply, "s", &response_message);
+    if (r < 0) {
+        fprintf(stderr, "Failed to parse reply: %s\n", strerror(-r));
+    } else {
+        printf("Response message: %s\n", response_message);
+    }
+}
+
+void call_create_table(sd_bus *bus, const char *table_name) {
+    sd_bus_message *reply = NULL;
+    int r;
+
+    r = sd_bus_call_method(bus,
+                           "net.poettering.Calculator",       // Service name
+                           "/net/poettering/Calculator", // Object path
+                           "net.poettering.Calculator",       // Interface name
+                           "create_table",                // Method name
+                           NULL,
+                           &reply,
+                           "s",                          // Input signature
+                           table_name);                  // Input parameter
+
+    if (r < 0) {
+        print_error("Failed to call CreateTable method", r);
+    } else {
+        print_reply(reply);
+        sd_bus_message_unref(reply);
+    }
+}
+
+void call_dbus_insert(sd_bus *bus, const char *table_name, const char *value) {
+    sd_bus_message *reply = NULL;
+    int r;
+
+    r = sd_bus_call_method(bus,
+                           "net.poettering.Calculator",       // Service name
+                           "/net/poettering/Calculator", // Object path
+                           "net.poettering.Calculator",       // Interface name
+                           "dbus_insert",
+                           NULL,
+                           &reply,
+                           "ss",
+                           table_name,
+                           value);
+
+    if (r < 0) {
+        print_error("Failed to call DBusInsert method", r);
+    } else {
+        print_reply(reply);
+        sd_bus_message_unref(reply);
+    }
+}
+
+void call_dbus_select(sd_bus *bus, const char *table_name) {
+    sd_bus_message *reply = NULL;
+    int r;
+
+    r = sd_bus_call_method(bus,
+                           "net.poettering.Calculator",       // Service name
+                           "/net/poettering/Calculator", // Object path
+                           "net.poettering.Calculator",       // Interface name
+                           "dbus_select",
+                           NULL,
+                           &reply,
+                           "s",
+                           table_name);
+
+    if (r < 0) {
+        print_error("Failed to call DBusSelect method", r);
+    } else {
+        print_reply(reply);
+        sd_bus_message_unref(reply);
+    }
+}
+/********/
 
 // 客户端处理函数
 void *handle_client(void *socket_desc) {
     int sock = *(int *)socket_desc;
     free(socket_desc); // 释放内存
     char client_message[2000]; // 缓冲区用于存储客户端消息
-    char response_message[2000]; // 用于存储从数据库检索的数据
     int read_size;
 
     // 接收客户端消息
     while ((read_size = recv(sock, client_message, 2000, 0)) > 0) {
         client_message[read_size] = '\0';
         printf("Received from client: %s\n", client_message);
-        //send(sock, client_message, strlen(client_message), 0); // 发送响应给客户端
 
         // 将数据插入数据库
-        //if (database_insert(data_base_name, client_message) == 0) {
-        //    printf("Data inserted successfully\n");
-        //} else {
-        //    printf("Failed to insert data\n");
-        //}
-
-        // 发送插入请求给dbus服务
-        send_insert_request(data_base_name,client_message);
-
+        call_dbus_insert(bus, "Messages", client_message);
         // 从数据库中选择数据
-        //database_select(data_base_name, response_message, MAX_MESSAGE_SIZE) == 0
-        if (database_select(data_base_name, response_message, 2000) == 0) {
-       		printf("Data select successfully\n");
-            // 发送响应消息给客户端
-            if (send(sock, response_message, strlen(response_message), 0) < 0) {
-                perror("send failed");
-            }
-        } else {
-            printf("Failed to select data\n");
+        call_dbus_select(bus, "Messages");
+        printf("Data select successfully\n");
+                
+        // 将客户端消息写入文件
+        FILE *fp = fopen("server_data.txt", "w");
+        if (fp == NULL) {
+            perror("Failed to open file");
+            close(sock);
+            return NULL;
         }
-
+        fprintf(fp, "%s", client_message);
+        fclose(fp); 
+        
+      if (send(sock, client_message, strlen(client_message), 0) < 0) {
+      perror("Send failed");
     }
-
+}
     if (read_size == 0) {
         puts("Client disconnected");
     } else if (read_size == -1) {
         perror("Recv failed");
     }
 
-    close(sock); // 关闭套接字
+   close(sock); // 关闭套接字
     return NULL;
 }
-
 int main() {
-
-    // 创建数据库表
-    if (create_table(data_base_name) != 0) {
-        fprintf(stderr, "Failed to create table\n");
-        return 1;
+    // 创建D-Bus连接
+    int r;
+    r = sd_bus_open_user(&bus);
+    if (r < 0) {
+        fprintf(stderr, "Failed to connect to D-Bus: %s\n", strerror(-r));
+        return EXIT_FAILURE;
     }
 
-    // 注册dbus服务
-    register_dbus_service();
+    call_create_table(bus, "Messages");
+
+    // 请求一个已知的服务名
+    r = sd_bus_request_name(bus, "com.example.CalculatorService", 0);
+    if (r < 0) {
+        fprintf(stderr, "Failed to acquire service name: %s\n", strerror(-r));
+        sd_bus_unref(bus);
+        return EXIT_FAILURE;
+    }
 
     // 创建socket
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);

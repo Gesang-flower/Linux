@@ -46,18 +46,18 @@ int main() {
             perror("send failed");
             return EXIT_FAILURE;
         }
-
-        /* 清空 server_reply 缓冲区 */
-        memset(server_reply, 0, sizeof(server_reply));
         
-        /* 接收服务器的响应 */
-        if (recv(sock, server_reply, 2000, 0) < 0) {
+        // 接收服务器的响应
+        if (recv(sock, server_reply, sizeof(server_reply), 0) < 0) {
             perror("recv failed");
             return EXIT_FAILURE;
         }
+        printf("Server reply: %s\n", server_reply);
 
-          printf("Server reply: %s\n", server_reply);
-        
+
+        /* 清空 server_reply 缓冲区 */
+        memset(server_reply, 0, sizeof(server_reply));
+               
     }
 
     close(sock);
