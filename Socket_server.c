@@ -114,16 +114,6 @@ void *handle_client(void *socket_desc) {
         call_dbus_select(bus, "Messages");
         printf("Data select successfully\n");
                 
-        // 将客户端消息写入文件
-        FILE *fp = fopen("server_data.txt", "w");
-        if (fp == NULL) {
-            perror("Failed to open file");
-            close(sock);
-            return NULL;
-        }
-        fprintf(fp, "%s", client_message);
-        fclose(fp); 
-        
       if (send(sock, client_message, strlen(client_message), 0) < 0) {
       perror("Send failed");
     }

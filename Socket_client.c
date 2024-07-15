@@ -16,7 +16,7 @@ int main() {
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
-    puts("Socket created");
+    //puts("Socket created");
 
     /* 准备地址 */
     struct sockaddr_in server;
@@ -35,24 +35,27 @@ int main() {
         perror("connect failed");
         return EXIT_FAILURE;
     }
-    puts("Connected");
-
+    //puts("Connected");
+    
     while (1) {
-        printf("Enter message: ");
+        //printf("Enter message: ");
         scanf("%s", message);
-	
-        /* 发送消息给服务器 */
+        
+       /* 发送消息给服务器 */
         if (send(sock, message, strlen(message), 0) < 0) {
             perror("send failed");
             return EXIT_FAILURE;
         }
         
+        // 清空 message 缓冲区，避免下一次循环重复发送相同的消息
+    	memset(message, 0, sizeof(message));
+    	
         // 接收服务器的响应
         if (recv(sock, server_reply, sizeof(server_reply), 0) < 0) {
             perror("recv failed");
             return EXIT_FAILURE;
         }
-        printf("Server reply: %s\n", server_reply);
+        printf("%s\n", server_reply);
 
 
         /* 清空 server_reply 缓冲区 */
