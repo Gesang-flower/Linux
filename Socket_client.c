@@ -6,7 +6,7 @@
 
 #define SERVER "127.0.0.1"
 #define PORT 8080
-
+#define FILENAME "./server_responses.txt"
 int main() {
     /* 创建 socket */
     int sock;
@@ -37,8 +37,14 @@ int main() {
     }
     //puts("Connected");
     
+    FILE *fp = fopen(FILENAME, "a+");
+    if (fp == NULL) {
+        perror("Error opening file");
+        return EXIT_FAILURE;
+    }
+    
     while (1) {
-        //printf("Enter message: ");
+        printf("Enter message: ");
         scanf("%s", message);
         
        /* 发送消息给服务器 */
@@ -55,14 +61,21 @@ int main() {
             perror("recv failed");
             return EXIT_FAILURE;
         }
-        printf("%s\n", server_reply);
-
-
+        
+        printf("Server reply: %s\n", server_reply);
+        
+        // 将响应写入文件
+        if (fprintf(fp, "%s\n", server_reply) < 0) {
+            perror("Error writing to file");
+            break;  // 如果写入失败，跳出循环
+        }
+	 fflush(fp);
+	 
         /* 清空 server_reply 缓冲区 */
         memset(server_reply, 0, sizeof(server_reply));
-               
     }
 
+    fclose(fp);
     close(sock);
     return 0;
 }

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 SOCKET_CLIENT="./Socket_client"
+FILENAME="./server_responses.txt"
 
 while true; do
     # 使用 dialog 显示界面，让用户输入数据
@@ -11,12 +12,15 @@ while true; do
         exit 1
     fi
 
-    # 发送数据给本地 SOCKET 客户端，仅当 MESSAGE 非空时发送
-    if [ -n "$MESSAGE" ]; then     
-        # 发送消息给 Socket_client
-        SERVER_REPLY=$(timeout 3 $SOCKET_CLIENT <<< "$MESSAGE")
-        dialog --msgbox "Server reply: $MESSAGE" 8 40
-        dialog --msgbox "Server reply: $SERVER_REPLY" 8 40
+    # 发送数据给 Socket_client
+    $SOCKET_CLIENT <<< "$MESSAGE"
+    
+    # 检查是否有服务器响应
+    if [ -s "$FILENAME" ]; then
+        RESPONSE=$(cat "$FILENAME")
+        dialog --msgbox "Server reply: $RESPONSE" 8 40
+        # 清空文件内容
+        > "$FILENAME"
     fi
 done
 
